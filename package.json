@@ -1,0 +1,20 @@
+{
+  "name": "test-automation-framework",
+  "version": "1.0.0",
+  "description": "Python-based test automation framework for web and mobile applications",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "testing",
+    "automation",
+    "python",
+    "web",
+    "mobile"
+  ],
+  "author": "Test Automation Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

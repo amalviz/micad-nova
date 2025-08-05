@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: test_automation_db
+    environment:
+      POSTGRES_DB: test_automation
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass123
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d test_automation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Automation Framework
+  test_framework:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: test_automation_framework
+    environment:
+      - DATABASE_URL=postgresql://testuser:testpass123@postgres:5432/test_automation
+      - WEB_HEADLESS=true
+      - LOG_LEVEL=INFO
+      - PARALLEL_WORKERS=2
+    volumes:
+      - ../tests:/app/tests
+      - ../reports:/app/reports
+      - ../logs:/app/logs
+      - ../screenshots:/app/screenshots
+      - ../videos:/app/videos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"  # For potential web interface
+    command: ["tail", "-f", "/dev/null"]  # Keep container running
+
+  # Selenium Grid Hub (for distributed web testing)
+  selenium-hub:
+    image: selenium/hub:4.15.0
+    container_name: selenium_hub
+    ports:
+      - "4444:4444"
+    environment:
+      - GRID_MAX_SESSION=16
+      - GRID_BROWSER_TIMEOUT=300
+      - GRID_TIMEOUT=300
+
+  # Chrome Node
+  selenium-chrome:
+    image: selenium/node-chrome:4.15.0
+    container_name: selenium_chrome
+    depends_on:
+      - selenium-hub
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+      - NODE_MAX_INSTANCES=4
+      - NODE_MAX_SESSION=4
+    volumes:
+      - /dev/shm:/dev/shm
+    scale: 2
+
+  # Firefox Node
+  selenium-firefox:
+    image: selenium/node-firefox:4.15.0
+    container_name: selenium_firefox
+    depends_on:
+      - selenium-hub
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+      - NODE_MAX_INSTANCES=4
+      - NODE_MAX_SESSION=4
+    volumes:
+      - /dev/shm:/dev/shm
+
+  # Appium Server (for mobile testing)
+  appium:
+    image: appium/appium:v2.2.1
+    container_name: appium_server
+    ports:
+      - "4723:4723"
+    environment:
+      - RELAXED_SECURITY=true
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - ./apps:/opt/appium/apps
+    privileged: true
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: test_automation_network
