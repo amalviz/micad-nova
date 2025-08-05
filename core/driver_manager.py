@@ -21,11 +21,14 @@ except ImportError:
 # Try to import mobile automation libraries
 try:
     from appium import webdriver as appium_webdriver
+    from appium.webdriver.webdriver import WebDriver
     from appium.options.android import UiAutomator2Options
     from appium.options.ios import XCUITestOptions
     APPIUM_AVAILABLE = True
 except ImportError:
     APPIUM_AVAILABLE = False
+    # Create mock class for type hints
+    class WebDriver: pass
 
 settings = get_settings()
 logger = get_logger(__name__)
