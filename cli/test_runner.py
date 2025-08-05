@@ -221,17 +221,29 @@ async def _run_tests(run_id: str, platform: str, app: Optional[str],
     if test_pattern:
         pytest_args.extend(['-k', test_pattern])
     
-    # Add parallel execution
+    # Add parallel execution (only if pytest-xdist is available)
     if settings.general.parallel_workers > 1:
-        pytest_args.extend(['-n', str(settings.general.parallel_workers)])
+        try:
+            import pytest_xdist
+            pytest_args.extend(['-n', str(settings.general.parallel_workers)])
+        except ImportError:
+            test_logger.warning("pytest-xdist not available, running tests sequentially")
     
-    # Add retry logic
+    # Add retry logic (only if pytest-rerunfailures is available)
     if settings.general.retry_failed_tests > 0:
-        pytest_args.extend(['--tb=short', f'--reruns={settings.general.retry_failed_tests}'])
+        try:
+            import pytest_rerunfailures
+            pytest_args.extend(['--tb=short', f'--reruns={settings.general.retry_failed_tests}'])
+        except ImportError:
+            test_logger.warning("pytest-rerunfailures not available, no retry logic")
     
-    # Add HTML report
-    html_report_path = settings.get_reports_dir() / f'pytest_report_{run_id}.html'
-    pytest_args.extend(['--html', str(html_report_path), '--self-contained-html'])
+    # Add HTML report (only if pytest-html is available)
+    try:
+        import pytest_html
+        html_report_path = settings.get_reports_dir() / f'pytest_report_{run_id}.html'
+        pytest_args.extend(['--html', str(html_report_path), '--self-contained-html'])
+    except ImportError:
+        test_logger.warning("pytest-html not available, no HTML report will be generated")
     
     # Set run ID for tests
     import os
