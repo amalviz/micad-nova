@@ -10,7 +10,6 @@ from typing import Optional, List, Dict, Any
 from core.logger import test_logger
 from config.settings import settings
 from config.database import db_manager
-from config.supabase_client import supabase_manager
 from core.test_tracker import tracker_manager
 
 # Try to import optional dependencies
@@ -102,7 +101,7 @@ def run(platform: str, app: Optional[str], environment: str, browser: Optional[s
     app_type = 'Web' if platform == 'web' else 'Mobile'
     test_tracker = tracker_manager.create_tracker(run_id, app_type, app)
     
-    # Also create in legacy database if available
+    # Create in database
     try:
         db_manager.create_test_run(
             run_id=run_id,
@@ -117,7 +116,7 @@ def run(platform: str, app: Optional[str], environment: str, browser: Optional[s
             }
         )
     except Exception as e:
-        test_logger.warning(f"Legacy database not available: {str(e)}")
+        test_logger.warning(f"Database not available: {str(e)}")
     
     try:
         # Run tests
@@ -145,7 +144,7 @@ def run(platform: str, app: Optional[str], environment: str, browser: Optional[s
                 skipped_tests=results['skipped']
             )
         except Exception as e:
-            test_logger.warning(f"Legacy database update failed: {str(e)}")
+            test_logger.warning(f"Database update failed: {str(e)}")
         
         # Generate reports
         if REPORTING_AVAILABLE:
@@ -161,9 +160,6 @@ def run(platform: str, app: Optional[str], environment: str, browser: Optional[s
         # Perform AI analysis if enabled and there are failures
         if settings.ai.enabled and results['failed'] > 0 and AI_AVAILABLE and ai_analyzer:
             test_logger.info("Performing AI analysis...")
-            # Get failed tests from Supabase
-            failed_tests = supabase_manager.get_failed_executions(run_id)
-            
             failed_tests = db_manager.get_failed_tests(run_id)
             if failed_tests:
                 ai_report = ai_analyzer.generate_report([
@@ -259,17 +255,24 @@ async def _run_tests(run_id: str, platform: str, app: Optional[str],
     # Get results from database
     try:
         test_results = db_manager.get_test_results(run_id)
-    except:
-        # Fallback to Supabase
-        test_results = supabase_manager.get_test_executions(run_id)
-    
-    results = {
-        'total': len(test_results),
-        'passed': len([t for t in test_results if getattr(t, 'status', t.get('test_status')) == 'passed']),
-        'failed': len([t for t in test_results if getattr(t, 'status', t.get('test_status')) in ['failed', 'error']]),
-        'skipped': len([t for t in test_results if getattr(t, 'status', t.get('test_status')) == 'skipped']),
-        'exit_code': exit_code
-    }
+        
+        results = {
+            'total': len(test_results),
+            'passed': len([t for t in test_results if t.status == 'passed']),
+            'failed': len([t for t in test_results if t.status in ['failed', 'error']]),
+            'skipped': len([t for t in test_results if t.status == 'skipped']),
+            'exit_code': exit_code
+        }
+    except Exception as e:
+        test_logger.warning(f"Failed to get test results from database: {str(e)}")
+        # Fallback to basic results based on exit code
+        results = {
+            'total': 0,
+            'passed': 0 if exit_code != 0 else 1,
+            'failed': 1 if exit_code != 0 else 0,
+            'skipped': 0,
+            'exit_code': exit_code
+        }
     
     return results
 

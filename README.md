@@ -2,23 +2,14 @@
 
 A comprehensive Python-based test automation framework supporting both web and mobile applications with advanced features including AI-powered failure analysis.
 
-## 🚀 Supabase Integration
+## 🗄️ Database Integration
 
-This framework integrates with Supabase to track all test executions with detailed information:
-- **App Type**: Web or Mobile application testing
-- **Application**: Specific application being tested
-- **Test Case Name**: Full test identifier (class.method)
-- **Test Case Description**: Extracted from test docstrings
-- **Test Status**: passed, failed, skipped, or error
-- **Test Duration**: Execution time in milliseconds
-- **Error Details**: Full error messages and stack traces
-- **Screenshots & Videos**: Captured media for failed tests
-
-### Setup Supabase Connection
-
-1. Click the "Connect to Supabase" button in the top right
-2. The database schema will be automatically created
-3. All test executions will be tracked in real-time
+This framework uses PostgreSQL to track all test executions with detailed information:
+- **Test Runs**: Overall test execution sessions with metadata
+- **Test Results**: Individual test case results with timing and status
+- **Error Tracking**: Full error messages and stack traces
+- **Media Storage**: Screenshot and video paths for failed tests
+- **AI Analysis**: Optional AI-powered failure analysis results
 
 ## Features
 
@@ -128,7 +119,6 @@ class TestMobileLogin(BaseMobileTest):
 The framework uses environment variables and configuration files:
 
 - `.env` - Environment-specific settings
-- Supabase connection via environment variables (auto-configured)
 - PostgreSQL database for local test result storage
 - `config/settings.py` - Framework configuration
 - `config/database.py` - Database configuration
@@ -162,13 +152,12 @@ Enable AI analysis with the `--ai-analysis` flag or set `ENABLE_AI_ANALYSIS=true
 - Groups related test cases by run_id
 - Stores summary statistics and metadata
 
-### Test Executions Table  
+### Test Results Table  
 - Individual test case results
 - Detailed execution information
 - Links to screenshots and videos
 - Error messages and stack traces
 
-All data is automatically synced to Supabase during test execution.
 ## Contributing
 
 1. Fork the repository

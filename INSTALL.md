@@ -183,17 +183,13 @@ python scripts/database_setup.py init --force
 
 ## 🔗 Supabase Integration
 
-1. **Connect to Supabase**:
-   - Click "Connect to Supabase" button in the UI
-   - Or manually set environment variables:
-     ```bash
-     VITE_SUPABASE_URL=your_supabase_url
-     VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-     ```
+## 🗄️ Database Integration
 
-2. **Database Schema**:
-   - Tables will be automatically created when you connect
-   - Both local PostgreSQL and Supabase will be used for redundancy
+The framework uses PostgreSQL as the primary database for storing test results:
+
+1. **Database Setup**: Follow the PostgreSQL setup instructions above
+2. **Schema Creation**: Tables are automatically created on first run
+3. **Test Tracking**: All test executions are automatically tracked
 
 ## 🧪 Running Tests
 

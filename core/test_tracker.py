@@ -1,15 +1,15 @@
 """
-Test execution tracking and reporting to Supabase.
+Test execution tracking and reporting to PostgreSQL database.
 """
 import uuid
 import time
 from typing import Optional, Dict, Any
 from datetime import datetime
 from core.logger import test_logger
-from config.supabase_client import supabase_manager
+from config.database import db_manager
 
 class TestTracker:
-    """Track test executions and sync with Supabase."""
+    """Track test executions and sync with PostgreSQL database."""
     
     def __init__(self, run_id: str, app_type: str, application: Optional[str] = None):
         self.run_id = run_id
@@ -22,14 +22,14 @@ class TestTracker:
         self._create_test_run()
     
     def _create_test_run(self):
-        """Create test run record in Supabase."""
+        """Create test run record in PostgreSQL database."""
         try:
-            supabase_manager.create_test_run(
+            db_manager.create_test_run(
                 run_id=self.run_id,
-                app_type=self.app_type,
+                platform=self.app_type,
                 application=self.application,
                 environment="test",
-                test_metadata={
+                metadata={
                     'framework_version': '1.0.0',
                     'created_by': 'test_automation_framework'
                 }
@@ -44,18 +44,17 @@ class TestTracker:
         self.test_start_time = time.time()
         
         try:
-            result = supabase_manager.create_test_execution(
+            result = db_manager.create_test_result(
                 run_id=self.run_id,
-                app_type=self.app_type,
-                application=self.application,
-                testcase_name=testcase_name,
-                testcase_description=testcase_description,
-                test_status='running',
+                test_name=testcase_name,
+                status='running',
+                test_class=test_metadata.get('test_class') if test_metadata else None,
+                test_module=test_metadata.get('test_module') if test_metadata else None,
                 test_metadata=test_metadata
             )
             
             if result:
-                self.current_execution_id = result['id']
+                self.current_execution_id = str(result.id)
                 test_logger.test_start(testcase_name)
                 return self.current_execution_id
             else:
@@ -78,16 +77,25 @@ class TestTracker:
         test_duration = int((time.time() - self.test_start_time) * 1000)  # Convert to milliseconds
         
         try:
-            supabase_manager.update_test_execution(
-                execution_id=self.current_execution_id,
-                test_status=test_status,
-                test_duration=test_duration,
-                error_message=error_message,
-                stack_trace=stack_trace,
-                screenshot_path=screenshot_path,
-                video_path=video_path,
-                test_metadata=test_metadata
-            )
+            # Update test result in database
+            with db_manager.get_session() as session:
+                from config.database import TestResult
+                test_result = session.query(TestResult).filter(
+                    TestResult.id == self.current_execution_id
+                ).first()
+                
+                if test_result:
+                    test_result.status = test_status
+                    test_result.end_time = datetime.utcnow()
+                    test_result.duration = test_duration
+                    test_result.error_message = error_message
+                    test_result.stack_trace = stack_trace
+                    test_result.screenshot_path = screenshot_path
+                    test_result.video_path = video_path
+                    if test_metadata:
+                        test_result.test_metadata = test_metadata
+                    
+                    session.commit()
             
             # Log test result
             if test_status == 'passed':
@@ -107,14 +115,14 @@ class TestTracker:
                           skipped_tests: int, status: str = 'completed'):
         """Update test run summary."""
         try:
-            supabase_manager.update_test_run(
+            db_manager.update_test_run(
                 run_id=self.run_id,
                 total_tests=total_tests,
                 passed_tests=passed_tests,
                 failed_tests=failed_tests,
                 skipped_tests=skipped_tests,
                 status=status,
-                end_time=datetime.utcnow().isoformat()
+                end_time=datetime.utcnow()
             )
             test_logger.info(f"Test run summary updated: {self.run_id}")
         except Exception as e:
@@ -127,10 +135,16 @@ class TestTracker:
             return
         
         try:
-            supabase_manager.update_test_execution(
-                execution_id=self.current_execution_id,
-                screenshot_path=screenshot_path
-            )
+            with db_manager.get_session() as session:
+                from config.database import TestResult
+                test_result = session.query(TestResult).filter(
+                    TestResult.id == self.current_execution_id
+                ).first()
+                
+                if test_result:
+                    test_result.screenshot_path = screenshot_path
+                    session.commit()
+                    
             test_logger.screenshot_taken(screenshot_path)
         except Exception as e:
             test_logger.error(f"Failed to add screenshot: {str(e)}")
@@ -142,10 +156,16 @@ class TestTracker:
             return
         
         try:
-            supabase_manager.update_test_execution(
-                execution_id=self.current_execution_id,
-                video_path=video_path
-            )
+            with db_manager.get_session() as session:
+                from config.database import TestResult
+                test_result = session.query(TestResult).filter(
+                    TestResult.id == self.current_execution_id
+                ).first()
+                
+                if test_result:
+                    test_result.video_path = video_path
+                    session.commit()
+                    
             test_logger.video_recorded(video_path)
         except Exception as e:
             test_logger.error(f"Failed to add video: {str(e)}")
@@ -153,16 +173,16 @@ class TestTracker:
     def get_run_statistics(self) -> Dict[str, Any]:
         """Get statistics for current test run."""
         try:
-            executions = supabase_manager.get_test_executions(self.run_id)
+            test_results = db_manager.get_test_results(self.run_id)
             
-            if not executions:
+            if not test_results:
                 return {}
             
-            total = len(executions)
-            passed = len([e for e in executions if e['test_status'] == 'passed'])
-            failed = len([e for e in executions if e['test_status'] == 'failed'])
-            error = len([e for e in executions if e['test_status'] == 'error'])
-            skipped = len([e for e in executions if e['test_status'] == 'skipped'])
+            total = len(test_results)
+            passed = len([t for t in test_results if t.status == 'passed'])
+            failed = len([t for t in test_results if t.status == 'failed'])
+            error = len([t for t in test_results if t.status == 'error'])
+            skipped = len([t for t in test_results if t.status == 'skipped'])
             
             return {
                 'run_id': self.run_id,
@@ -171,7 +191,7 @@ class TestTracker:
                 'failed_tests': failed + error,
                 'skipped_tests': skipped,
                 'pass_rate': round((passed / total * 100), 2) if total > 0 else 0,
-                'executions': executions
+                'test_results': test_results
             }
             
         except Exception as e:
