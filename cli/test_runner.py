@@ -372,12 +372,7 @@ def analyze(run_id: Optional[str], failed_only: bool):
                     'test_name': t.test_name,
                     'status': t.status,
                     'error_message': t.error_message,
-                    'cli_options': {
-                        'headless': headless,
-                        'retry': retry,
-                        'timeout': timeout,
-                        'ai_analysis': ai_analysis
-                    }
+                    'stack_trace': t.stack_trace
                 }
                 for t in test_results
             ]
