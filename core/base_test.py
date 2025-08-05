@@ -5,7 +5,7 @@ import pytest
 from typing import Optional, Any
 import uuid
 import os
-from core.driver_manager import DriverManager
+from core.driver_manager import DriverManager, WebDriverManager, MobileDriverManager
 from core.logger import get_logger
 from config.settings import get_settings
 from core.test_tracker import tracker_manager

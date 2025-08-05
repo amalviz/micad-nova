@@ -283,3 +283,49 @@ class MobileDriverManager:
                 test_logger.info("Mobile driver closed successfully")
         except Exception as e:
             test_logger.error(f"Error closing mobile driver: {str(e)}")
+
+class DriverManager:
+    """Unified driver manager for both web and mobile testing."""
+    
+    def __init__(self):
+        self.web_manager = WebDriverManager()
+        self.mobile_manager = MobileDriverManager()
+        self.current_platform = None
+    
+    async def get_web_driver(self, **kwargs):
+        """Get web driver instance."""
+        self.current_platform = 'web'
+        return await self.web_manager.start_browser(**kwargs)
+    
+    def get_mobile_driver(self, **kwargs):
+        """Get mobile driver instance."""
+        self.current_platform = 'mobile'
+        return self.mobile_manager.start_driver(**kwargs)
+    
+    async def take_screenshot(self, path: str = None) -> str:
+        """Take screenshot based on current platform."""
+        if self.current_platform == 'web':
+            return await self.web_manager.take_screenshot(path)
+        elif self.current_platform == 'mobile':
+            return self.mobile_manager.take_screenshot(path)
+        else:
+            raise RuntimeError("No active driver to take screenshot")
+    
+    def get_screenshot_path(self) -> str:
+        """Get screenshot path (placeholder for compatibility)."""
+        return "screenshots/current.png"
+    
+    def get_page_source(self) -> str:
+        """Get page source (placeholder for compatibility)."""
+        if self.current_platform == 'web' and self.web_manager.page:
+            # This would need to be async in real implementation
+            return "Page source not available in sync context"
+        return "Page source not available"
+    
+    async def quit(self):
+        """Quit all drivers."""
+        if self.current_platform == 'web':
+            await self.web_manager.close()
+        elif self.current_platform == 'mobile':
+            self.mobile_manager.close()
+        self.current_platform = None
